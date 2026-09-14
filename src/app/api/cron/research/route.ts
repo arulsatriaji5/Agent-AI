@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
-import { getTursoClient } from "@/lib/turso";
+import { getTursoClient, initDb } from "@/lib/turso";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
 
 interface BinanceTicker {
   symbol: string;
@@ -129,6 +130,9 @@ export async function GET(request: NextRequest) {
     // }
 
     console.log("🚀 [CRON] Starting financial research...");
+
+    // 0) Initialize DB
+    await initDb();
 
     // 1) Fetch live data
     const ticker = await fetchBinanceData();
