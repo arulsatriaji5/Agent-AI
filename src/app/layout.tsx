@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Sidebar } from "@/components/Sidebar";
+import { ChatProvider } from "@/context/ChatContext";
 
 export const viewport: Viewport = {
   themeColor: "#171717",
@@ -11,13 +12,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "BTC Research Dashboard",
-  description: "AI-Powered Bitcoin Market Intelligence",
+  title: "Agent AI - Autonomous Financial & Market Intelligence",
+  description: "Asisten AI cerdas untuk analisis teknikal, tren pasar kripto, dan riset saham otonom.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "BTC Research",
+    title: "Agent AI",
   },
 };
 
@@ -27,12 +28,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className="flex h-screen overflow-hidden bg-[#171717] text-gray-100 font-sans">
-        <Sidebar />
-        <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#212121] md:rounded-l-[2rem] border-l border-white/5 relative z-10 md:shadow-2xl">
-          {children}
-        </main>
+    <html lang="id" className="dark">
+      <body className="flex h-screen overflow-hidden bg-[#171717] text-gray-100 font-sans antialiased">
+        <ChatProvider>
+          <Sidebar />
+          <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#212121] md:rounded-l-[2rem] border-l border-white/5 relative z-10 md:shadow-2xl">
+            {children}
+          </main>
+        </ChatProvider>
       </body>
     </html>
   );

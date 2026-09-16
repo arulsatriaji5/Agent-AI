@@ -1,7 +1,7 @@
 {
-  "name": "BTC Research Dashboard",
-  "short_name": "BTC Research",
-  "description": "AI-Powered Bitcoin Market Intelligence",
+  "name": "Agent AI - Financial Intelligence",
+  "short_name": "Agent AI",
+  "description": "AI-Powered Bitcoin, Crypto, & Saham Indo Autonomous Market Intelligence",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
