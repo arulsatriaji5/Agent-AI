@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { google, githubModels } from "@/lib/ai-providers";
 import { getTursoClient, initDb } from "@/lib/turso";
+import { getQuote, getMarketNews } from "@/lib/finnhub";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -34,7 +35,16 @@ interface CarouselSlide {
   imageUrl: string;
 }
 
+interface BullishSignal {
+  symbol: string;
+  assetType: "Crypto" | "Saham";
+  price: number;
+  change24h: number;
+  reason: string;
+}
+
 interface AutonomousReport {
+  output_type: "CAROUSEL" | "ANALYSIS" | "SCANNER";
   sentiment: "Bullish" | "Bearish" | "Neutral";
   sentimentScore: number;
   marketSummary: string;
@@ -47,6 +57,17 @@ interface AutonomousReport {
   };
   sahamIndoData: StockQuote[];
   slides: CarouselSlide[];
+  signals?: BullishSignal[];
+  realtimeData?: {
+    asset: string;
+    price: number;
+    changePercent: number;
+    high: number;
+    low: number;
+    sentiment: "Bullish" | "Bearish" | "Neutral";
+    analysisText: string;
+    newsSummary: Array<{headline: string; url: string}>;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -147,11 +168,83 @@ function buildPollinationsUrl(prompt: string, seed?: number): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const userTask = body?.task || "";
+    
+    // Support either single task (legacy) or messages array (conversational)
+    const messages = body?.messages || [];
+    const lastUserMessage = messages.length > 0 ? messages[messages.length - 1].content : "";
+    const userTask = body?.task || lastUserMessage || "";
+    
+    // Build context string from history if any
+    const historyContext = messages.length > 1 
+      ? messages.slice(0, -1).map((m: any) => `${m.role === 'user' ? 'User' : 'Agent'}: ${m.content}`).join("\n")
+      : "";
+
     const requestedModel = body?.model || "gemini-2.5-flash";
-    const selectedModel = requestedModel === "gemini-2.5-pro" ? "gemini-2.5-pro" : "gemini-2.5-flash";
+    
+    console.log("Menerima request dengan model:", requestedModel);
+    
+    let selectedModel;
+    switch (requestedModel) {
+      case 'gpt-4o-mini':
+      case 'Meta-Llama-3.1-70B-Instruct':
+        if (!process.env.GITHUB_TOKEN) {
+          throw new Error("GITHUB_TOKEN tidak ditemukan di environment variables");
+        }
+        selectedModel = githubModels(requestedModel);
+        break;
+      default:
+        if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+          throw new Error("GOOGLE_GENERATIVE_AI_API_KEY tidak ditemukan");
+        }
+        selectedModel = google(requestedModel);
+        break;
+    }
 
     console.log("⚡ [WORK_MODE] Starting Autonomous Agent Pipeline with task:", userTask || "Default multi-market research");
+
+    // 0. Detect specific asset for Finnhub Real-Time Data
+    let detectedSymbol = "";
+    let finnhubCategory: "general" | "crypto" | "forex" = "general";
+    const u = userTask.toUpperCase();
+    
+    if (u.includes("BTC") || u.includes("BITCOIN")) {
+      detectedSymbol = "BINANCE:BTCUSDT";
+      finnhubCategory = "crypto";
+    } else if (u.includes("ETH") || u.includes("ETHEREUM")) {
+      detectedSymbol = "BINANCE:ETHUSDT";
+      finnhubCategory = "crypto";
+    } else if (u.includes("BBCA")) {
+      detectedSymbol = "BBCA.JK";
+    } else if (u.includes("BBRI")) {
+      detectedSymbol = "BBRI.JK";
+    } else if (u.includes("BMRI")) {
+      detectedSymbol = "BMRI.JK";
+    } else if (u.includes("IHSG")) {
+      detectedSymbol = "^JKSE";
+    } else if (u.includes("AAPL") || u.includes("APPLE")) {
+      detectedSymbol = "AAPL";
+    } else if (u.includes("MSFT")) {
+      detectedSymbol = "MSFT";
+    }
+
+    let finnhubRealtime: any = null;
+    let finnhubNews: any[] = [];
+    if (detectedSymbol) {
+      const quote = await getQuote(detectedSymbol);
+      if (quote && quote.c > 0) {
+        finnhubNews = await getMarketNews(finnhubCategory);
+        finnhubRealtime = {
+          symbol: detectedSymbol,
+          price: quote.c,
+          change: quote.d,
+          changePercent: quote.dp,
+          high: quote.h,
+          low: quote.l,
+          newsTitles: finnhubNews.map((n: any) => n.headline).join(" | "),
+          newsRaw: finnhubNews.slice(0, 3)
+        };
+      }
+    }
 
     // 0. Ensure Database Tables exist
     try {
@@ -181,78 +274,53 @@ export async function POST(req: NextRequest) {
     const sahamData = await fetchIndoStockQuotes();
 
     // 3. Autonomous Reasoning with Gemini
-    const systemPrompt = `You are the Lead Autonomous Financial Research Agent.
-Synthesize the provided real-time multi-market data (Bitcoin, Ethereum, Solana, and Indonesian Stocks: BBCA, BBRI, BMRI, IHSG) into an executive content package designed for social carousels and institutional readers.
-
-You must return a STRICT JSON object without any markdown code fences, backticks, or other text outside the JSON.`;
+    const systemPrompt = `Anda adalah Agent AI, Asisten Otonom Canggih.
+Tugas Anda adalah bertindak sebagai Agentic Router: memahami maksud instruksi pengguna secara mendalam dan memutuskan jenis respons ("output_type").
+PENTING:
+1. JIKA pengguna HANYA bertanya informasi, analisis langsung, atau harga pasar (misal: "ihsg berapa", "apa itu AI", "prospek BBCA"), output_type Anda adalah "ANALYSIS". Anda JANGAN membuat carousel visual. Cukup berikan analisis tajam 2 paragraf di field "marketSummary".
+2. JIKA pengguna secara eksplisit meminta pembuatan KONTEN, CAROUSEL, PRESENTASI, atau menekan tombol Riset Harian, output_type Anda adalah "CAROUSEL". Buat 3-5 slide.
+3. JIKA pengguna meminta SCANNING, DETEKSI SINYAL, atau "Scan Sinyal Bullish", output_type Anda adalah "SCANNER". Temukan aset dari DATA PASAR yang berpotensi naik/bullish dan masukkan ke field "signals".
+4. Anda WAJIB mengembalikan HANYA objek JSON yang valid tanpa backticks markdown.`;
 
     const userPrompt = `
-${userTask ? `SPECIFIC USER TASK ASSIGNED: "${userTask}"\nTailor all slide titles, summaries, and key points to directly answer and research this task using the real-time market data below.\n` : ""}
-CURRENT MARKET DATA:
-- Bitcoin (BTCUSDT): $${btcPrice.toLocaleString()} (${btcChange > 0 ? "+" : ""}${btcChange}%) | 24h Vol: ${btcVol} BTC
-- Ethereum (ETHUSDT): $${ethPrice.toLocaleString()} (${ethChange > 0 ? "+" : ""}${ethChange}%)
-- Solana (SOLUSDT): $${solPrice.toLocaleString()} (${solChange > 0 ? "+" : ""}${solChange}%)
-- Indonesian Stocks & IHSG:
-${sahamData.map((s) => `  * ${s.symbol} (${s.name}): Rp ${s.price.toLocaleString()} (${s.changePercent > 0 ? "+" : ""}${s.changePercent}%)`).join("\n")}
+${historyContext ? `KONTEKS OBROLAN SEBELUMNYA:\n${historyContext}\n\n` : ""}
+PERINTAH PENGGUNA: "${userTask || "Berikan ringkasan kondisi pasar hari ini"}"
 
-GENERATE JSON WITH THESE EXACT FIELDS:
+${finnhubRealtime ? `
+[DATA REAL-TIME FINNHUB]
+Aset: ${finnhubRealtime.symbol}
+Harga Terkini: $${finnhubRealtime.price}
+Perubahan 24 Jam: ${finnhubRealtime.changePercent}% (Nominal: ${finnhubRealtime.change})
+Rentang Harian: Low ${finnhubRealtime.low} - High ${finnhubRealtime.high}
+Headline Berita: ${finnhubRealtime.newsTitles}
+` : ""}
+
+DATA PASAR UMUM (Gunakan untuk menjawab pertanyaan, analisis, atau scanner):
+- Bitcoin: $${btcPrice.toLocaleString()} (${btcChange > 0 ? "+" : ""}${btcChange}%)
+- Ethereum: $${ethPrice.toLocaleString()} (${ethChange > 0 ? "+" : ""}${ethChange}%)
+- Solana: $${solPrice.toLocaleString()} (${solChange > 0 ? "+" : ""}${solChange}%)
+- Saham Indo: ${sahamData.map((s) => `${s.symbol} Rp${s.price.toLocaleString()} (${s.changePercent > 0 ? "+" : ""}${s.changePercent}%)`).join(", ")}
+
+GENERATE JSON DENGAN FORMAT BERIKUT SECARA KETAT:
 {
+  "output_type": "CAROUSEL" | "ANALYSIS" | "SCANNER",
   "sentiment": "Bullish" | "Bearish" | "Neutral",
-  "sentimentScore": number between 1 and 100,
-  "marketSummary": "2-3 comprehensive sentences summarizing cross-market dynamics in Indonesian",
-  "coverHook": "Engaging high-impact title/hook for Indonesian finance audience (e.g. 🚨 SINYAL KUAT: BTC Tembus Resisten, Saham Bank Jumbo Diborong Asing!)",
+  "sentimentScore": number (1-100),
+  "marketSummary": "Ringkasan analisis tajam 2 paragraf (wajib untuk ANALYSIS atau SCANNER. Jika CAROUSEL cukup 1-2 kalimat). Gunakan format markdown.",
+  "coverHook": "Judul laporan (hanya jika CAROUSEL)",
   "slides": [
-    {
-      "slideNumber": 1,
-      "type": "cover",
-      "badge": "COVER & HOOK",
-      "title": "Short punchy slide headline",
-      "summary": "Compelling 2-sentence hook preview",
-      "keyPoints": ["Key highlight 1", "Key highlight 2"],
-      "visualPrompt": "English prompt for cover 3D finance futuristic artwork (max 40 words)"
-    },
-    {
-      "slideNumber": 2,
-      "type": "crypto_macro",
-      "badge": "KRIPTO & MAKRO",
-      "title": "Bitcoin & Likuiditas Global",
-      "summary": "Explanation of BTC price action, ETF flows, and crypto macro sentiment in Indonesian",
-      "keyPoints": ["Data point 1", "Data point 2", "Data point 3"],
-      "visualPrompt": "English prompt for Bitcoin futuristic digital blockchain artwork"
-    },
-    {
-      "slideNumber": 3,
-      "type": "saham_indo",
-      "badge": "SAHAM INDONESIA",
-      "title": "IHSG & Katalis Perbankan Jumbo",
-      "summary": "Analysis of BBCA, BBRI, BMRI, foreign fund flow, and domestic market momentum in Indonesian",
-      "keyPoints": ["Saham insight 1", "Saham insight 2", "Saham insight 3"],
-      "visualPrompt": "English prompt for Jakarta Indonesia stock exchange bull market 3D render"
-    },
-    {
-      "slideNumber": 4,
-      "type": "technical",
-      "badge": "ANALISIS TEKNIKAL",
-      "title": "Level Kunci & Zona Akumulasi",
-      "summary": "Support and resistance levels for BTC and key Indonesian equities with volume outlook in Indonesian",
-      "keyPoints": ["Support level", "Resistance level", "Volume breakout watch"],
-      "visualPrompt": "English prompt for neon holographic candlestick technical chart analysis"
-    },
-    {
-      "slideNumber": 5,
-      "type": "action_plan",
-      "badge": "ACTION PLAN",
-      "title": "Rekomendasi Taktis Trader & Investor",
-      "summary": "Clear risk-managed tactical takeaways and portfolio allocations in Indonesian",
-      "keyPoints": ["Action step 1", "Action step 2", "Risk alert"],
-      "visualPrompt": "English prompt for 3D shield and portfolio risk management cyber finance"
-    }
+    // ISI ARRAY INI HANYA JIKA output_type ADALAH 'CAROUSEL'
+    { "slideNumber": 1, "type": "cover", "badge": "COVER", "title": "Judul", "summary": "Ringkasan", "keyPoints": ["Poin 1"], "visualPrompt": "Prompt visual HD dalam bahasa Inggris" }
+  ],
+  "signals": [
+    // ISI ARRAY INI JIKA output_type ADALAH 'SCANNER', ATAU JIKA 'ANALYSIS' membahas aset spesifik.
+    { "symbol": "BBCA", "assetType": "Saham", "price": 9850, "change24h": 1.25, "reason": "Analisis singkat aset ini" }
   ]
 }
 `;
 
     const { text } = await generateText({
-      model: google(selectedModel),
+      model: selectedModel,
       system: systemPrompt,
       prompt: userPrompt,
       temperature: 0.3,
@@ -331,9 +399,10 @@ GENERATE JSON WITH THESE EXACT FIELDS:
       };
     }
 
-    // Build image URLs for all slides using Pollinations.ai
-    const formattedSlides: CarouselSlide[] = parsed.slides.map(
-      (slide: any, index: number) => {
+    // Build image URLs for all slides using Pollinations.ai (only if it's a carousel)
+    let formattedSlides: CarouselSlide[] = [];
+    if (parsed.output_type === "CAROUSEL" && Array.isArray(parsed.slides)) {
+      formattedSlides = parsed.slides.map((slide: any, index: number) => {
         const seed = 1000 + index * 4567 + Math.floor(Math.random() * 1000);
         return {
           slideNumber: slide.slideNumber || index + 1,
@@ -345,10 +414,11 @@ GENERATE JSON WITH THESE EXACT FIELDS:
           visualPrompt: slide.visualPrompt || "futuristic 3D finance chart",
           imageUrl: buildPollinationsUrl(slide.visualPrompt || "futuristic finance", seed),
         };
-      }
-    );
+      });
+    }
 
     const reportPayload: AutonomousReport = {
+      output_type: parsed.output_type || "CAROUSEL",
       sentiment: ["Bullish", "Bearish", "Neutral"].includes(parsed.sentiment)
         ? parsed.sentiment
         : "Bullish",
@@ -363,6 +433,17 @@ GENERATE JSON WITH THESE EXACT FIELDS:
       },
       sahamIndoData: sahamData,
       slides: formattedSlides,
+      signals: parsed.signals || [],
+      realtimeData: (parsed.output_type === "ANALYSIS" && finnhubRealtime) ? {
+        asset: finnhubRealtime.symbol,
+        price: finnhubRealtime.price,
+        changePercent: finnhubRealtime.changePercent,
+        high: finnhubRealtime.high,
+        low: finnhubRealtime.low,
+        sentiment: ["Bullish", "Bearish", "Neutral"].includes(parsed.sentiment) ? parsed.sentiment : "Bullish",
+        analysisText: parsed.marketSummary || "Tidak ada ringkasan yang tersedia.",
+        newsSummary: finnhubRealtime.newsRaw.map((n: any) => ({ headline: n.headline, url: n.url }))
+      } : undefined,
     };
 
     // 4. Persist to Turso DB

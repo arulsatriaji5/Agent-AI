@@ -73,6 +73,15 @@ export async function initDb() {
     );
   `);
 
+  // Create chat_sessions
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id          TEXT PRIMARY KEY,
+      title       TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
   isInitialized = true;
 }
 

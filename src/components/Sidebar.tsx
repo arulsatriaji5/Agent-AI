@@ -291,7 +291,12 @@ function ChatItem({ session, isActive, onSelect, onTogglePin, onDelete }: ChatIt
         </button>
         <button
           title="Hapus obrolan"
-          onClick={onDelete}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (window.confirm("Apakah Anda yakin ingin menghapus obrolan ini?")) {
+              onDelete(e);
+            }
+          }}
           className="p-1 rounded text-gray-400 hover:text-red-400 hover:bg-white/10 transition-colors"
         >
           <Trash2 className="w-3 h-3" />

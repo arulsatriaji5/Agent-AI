@@ -6,6 +6,9 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  report?: any;
+  isProcessing?: boolean;
+  completionTime?: number;
   createdAt?: string | Date;
 }
 
@@ -146,12 +149,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
       if (messages.length === 0) return sessionId || "";
 
       // Derive auto title from first user message if not explicitly provided
-      const firstUserMsg = messages.find((m) => m.role === "user")?.content || "Obrolan Pasar";
+      const firstUserMsg = messages.find((m) => m.role === "user")?.content || "Obrolan Baru";
       const cleanTitle =
         customTitle ||
-        (firstUserMsg.length > 36 ? firstUserMsg.slice(0, 36) + "..." : firstUserMsg);
+        (firstUserMsg.length > 30 ? firstUserMsg.substring(0, 30) + "..." : firstUserMsg);
 
       let targetId = sessionId;
+      let finalTitle = cleanTitle;
 
       setSessions((prev) => {
         const existingIndex = prev.findIndex((s) => s.id === targetId);
@@ -159,17 +163,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         if (existingIndex >= 0 && targetId) {
           // Update existing
           const updated = [...prev];
+          let currentTitle = updated[existingIndex].title;
+          if (!currentTitle || currentTitle === "Obrolan Pasar" || currentTitle === "Obrolan Baru" || currentTitle.includes("Agent sedang")) {
+            currentTitle = cleanTitle;
+          }
+          finalTitle = currentTitle;
+
           updated[existingIndex] = {
             ...updated[existingIndex],
             messages,
             updatedAt: Date.now(),
-            title: updated[existingIndex].title || cleanTitle,
+            title: currentTitle,
           };
           return updated;
         } else {
           // Create new session
           const newId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
           targetId = newId;
+          finalTitle = cleanTitle;
           const newSession: ChatSession = {
             id: newId,
             title: cleanTitle,
@@ -184,6 +195,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
       if (targetId && targetId !== activeSessionId) {
         setActiveSessionId(targetId);
+      }
+
+      // Sync the title to Turso in the background
+      if (targetId) {
+        fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: targetId, title: finalTitle }),
+        }).catch(err => console.error("Failed to sync session title to Turso:", err));
       }
 
       return targetId || "";
