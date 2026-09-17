@@ -15,7 +15,10 @@ import {
   ChevronRight,
   Layers,
   Paperclip,
-  ArrowUp
+  ArrowUp,
+  Image as ImageIcon,
+  Folder,
+  X
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { useChatContext, ChatMessage } from "@/context/ChatContext";
@@ -66,6 +69,14 @@ export function WorkMode() {
   const { activeSession, saveOrUpdateSession, activeSessionId } = useChatContext();
   const [model, setModel] = useState<string>("gemini-2.5-flash");
   const [taskInput, setTaskInput] = useState("");
+  
+  // Attachments State
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [folderContext, setFolderContext] = useState<string>("");
+  const [folderName, setFolderName] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const messages = activeSession?.messages || [];
@@ -79,11 +90,63 @@ export function WorkMode() {
     scrollToBottom();
   }, [messages]);
 
+  const processFolder = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    const firstPath = files[0].webkitRelativePath;
+    const fName = firstPath ? firstPath.split('/')[0] : "Folder Proyek";
+    setFolderName(fName);
+
+    let combinedText = `[KONTEKS FOLDER PROYEK: ${fName}]\n\n`;
+    let fileCount = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (
+        file.name.includes('.git') || 
+        file.webkitRelativePath.includes('node_modules/') ||
+        file.webkitRelativePath.includes('.next/') ||
+        file.name.endsWith('.png') || file.name.endsWith('.jpg') || file.name.endsWith('.pdf') || file.name.endsWith('.exe')
+      ) continue;
+      if (file.size > 500 * 1024) continue; 
+
+      try {
+        const text = await file.text();
+        combinedText += `--- FILE: ${file.webkitRelativePath} ---\n${text}\n\n`;
+        fileCount++;
+      } catch (err) {
+        console.error("Error reading file", file.name, err);
+      }
+    }
+    
+    if (fileCount > 0) setFolderContext(combinedText);
+    else setFolderName("");
+    
+    if (folderInputRef.current) folderInputRef.current.value = '';
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setAttachments(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const runAction = async (customPrompt?: string) => {
-    const finalTask = (customPrompt || taskInput).trim();
-    if (!finalTask || isWorking) return;
+    const rawTask = customPrompt || taskInput;
+    const finalTask = folderContext ? `${folderContext}\n${rawTask.trim()}` : rawTask.trim();
+    
+    if ((!finalTask && attachments.length === 0) || isWorking) return;
     
     setTaskInput("");
+    setFolderContext("");
+    setFolderName("");
+    setAttachments([]);
 
     // Create a new array of messages including the user's prompt
     const newMessages: ChatMessage[] = [
@@ -271,33 +334,78 @@ export function WorkMode() {
               </h1>
             </div>
 
-            <div className="bg-[#2f2f2f] rounded-2xl p-2 border border-white/10 flex items-center shadow-lg focus-within:border-white/20 transition-colors">
-              <select 
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="bg-[#212121] text-gray-200 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer appearance-none ml-2"
-              >
-                <option className="bg-[#171717] text-gray-200" value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                <option className="bg-[#171717] text-gray-200" value="gpt-4o-mini">GPT-4o Mini - GitHub</option>
-                <option className="bg-[#171717] text-gray-200" value="Meta-Llama-3.1-70B-Instruct">Llama 3.1 70B - GitHub</option>
-              </select>
+            <div className="bg-[#2f2f2f] rounded-2xl p-1 sm:p-2 border border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center shadow-lg focus-within:border-white/20 transition-colors">
+              <div className="flex items-center justify-between sm:justify-start border-b sm:border-b-0 sm:border-r border-white/10 px-2 py-2 sm:py-0">
+                <div className="flex items-center gap-1">
+                  <button 
+                    type="button" 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 text-gray-400 hover:text-blue-400 rounded-full hover:bg-white/10 transition-colors"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => folderInputRef.current?.click()}
+                    className="p-2 text-gray-400 hover:text-amber-400 rounded-full hover:bg-white/10 transition-colors"
+                  >
+                    <Folder className="w-5 h-5" />
+                  </button>
+                </div>
+                
+                <select 
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="bg-transparent text-gray-300 border-none rounded-lg px-2 py-1 focus:outline-none focus:ring-0 cursor-pointer appearance-none ml-2 text-xs sm:text-sm max-w-[140px] truncate"
+                >
+                  <option className="bg-[#171717] text-gray-200" value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                  <option className="bg-[#171717] text-gray-200" value="gpt-4o-mini">GPT-4o Mini</option>
+                  <option className="bg-[#171717] text-gray-200" value="Meta-Llama-3.1-70B-Instruct">Llama 3.1 70B</option>
+                </select>
+              </div>
 
-              <input 
-                value={taskInput}
-                onChange={(e) => setTaskInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Kerjakan apa saja..." 
-                className="flex-1 bg-transparent text-gray-100 px-4 py-3 focus:outline-none placeholder-gray-500 text-sm"
-              />
+              <div className="flex flex-1 items-center px-1 sm:px-0">
+                <input 
+                  value={taskInput}
+                  onChange={(e) => setTaskInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Kerjakan apa saja..." 
+                  className="flex-1 bg-transparent text-gray-100 px-4 py-3 sm:py-4 focus:outline-none placeholder-gray-500 text-sm"
+                />
 
-              <button 
-                onClick={() => runAction()}
-                disabled={isWorking || !taskInput.trim()}
-                className="p-3 bg-white/10 hover:bg-white/20 rounded-xl text-white transition-colors disabled:opacity-40"
-              >
-                <Play className="w-5 h-5 fill-white" />
-              </button>
+                <button 
+                  onClick={() => runAction()}
+                  disabled={isWorking || (!taskInput.trim() && attachments.length === 0)}
+                  className="p-2 sm:p-3 mr-1 bg-blue-600 hover:bg-blue-500 rounded-xl text-white transition-colors disabled:opacity-50 disabled:bg-white/10"
+                >
+                  <Play className="w-5 h-5 fill-current" />
+                </button>
+              </div>
             </div>
+
+            {/* Hidden Inputs */}
+            <input type="file" multiple accept="image/*" ref={fileInputRef} className="hidden" onChange={(e) => { if (e.target.files) setAttachments(prev => [...prev, ...Array.from(e.target.files!)]); }} />
+            <input type="file" /* @ts-expect-error */ webkitdirectory="" directory="" ref={folderInputRef} className="hidden" onChange={processFolder} />
+
+            {/* Upload previews */}
+            {(attachments.length > 0 || folderName) && (
+              <div className="flex flex-wrap gap-2 mt-4 px-2 justify-center">
+                {attachments.map((file, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg text-sm text-gray-200">
+                    <ImageIcon className="w-4 h-4 text-blue-400" />
+                    <span className="truncate max-w-[120px]">{file.name}</span>
+                    <button type="button" onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-400 ml-1"><X className="w-4 h-4" /></button>
+                  </div>
+                ))}
+                {folderName && (
+                  <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg text-sm text-gray-200">
+                    <Folder className="w-4 h-4 text-amber-400" />
+                    <span className="truncate max-w-[150px]">{folderName}</span>
+                    <button type="button" onClick={() => { setFolderName(""); setFolderContext(""); }} className="text-gray-400 hover:text-red-400 ml-1"><X className="w-4 h-4" /></button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <ActionCard 
@@ -368,56 +476,91 @@ export function WorkMode() {
         )}
       </div>
 
-      {/* Fixed Bottom Input Bar (Only visible in thread mode, but we can make it unified if we want. For now, empty state has it centered, active state has it sticky bottom) */}
       {messages.length > 0 && (
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#212121] via-[#212121] to-transparent pt-12">
-          <div className="max-w-3xl mx-auto">
-            <div className="bg-[#2f2f2f] rounded-2xl p-2 border border-white/10 flex items-center shadow-2xl focus-within:border-white/20 transition-colors">
-              <button 
-                className="p-2.5 text-gray-400 hover:text-gray-200 hover:bg-white/5 rounded-xl transition-colors shrink-0"
-                title="Lampirkan File"
-              >
-                <Paperclip className="w-5 h-5" />
-              </button>
+        <div className="w-full p-3 sm:p-4 bg-[#212121]/95 backdrop-blur-md border-t border-white/5 shadow-[0_-10px_40px_rgba(33,33,33,0.9)] sticky bottom-0 z-10 shrink-0">
+          
+          {/* Upload previews for bottom bar */}
+          {(attachments.length > 0 || folderName) && (
+            <div className="max-w-3xl mx-auto flex flex-wrap gap-2 mb-2 px-2">
+              {attachments.map((file, idx) => (
+                <div key={idx} className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-lg text-xs text-gray-200">
+                  <ImageIcon className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="truncate max-w-[100px]">{file.name}</span>
+                  <button type="button" onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-400 ml-1"><X className="w-3 h-3" /></button>
+                </div>
+              ))}
+              {folderName && (
+                <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-lg text-xs text-gray-200">
+                  <Folder className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="truncate max-w-[100px]">{folderName}</span>
+                  <button type="button" onClick={() => { setFolderName(""); setFolderContext(""); }} className="text-gray-400 hover:text-red-400 ml-1"><X className="w-3 h-3" /></button>
+                </div>
+              )}
+            </div>
+          )}
 
-              <div className="h-6 w-px bg-white/10 mx-1 shrink-0" />
+          <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center bg-[#2f2f2f] rounded-2xl border border-white/10 focus-within:border-white/20 transition-colors shadow-lg p-1 sm:p-0">
+            <div className="flex items-center justify-between sm:justify-start border-b sm:border-b-0 sm:border-r border-white/10 px-2 py-2 sm:py-0">
+              <div className="flex items-center gap-1">
+                <button 
+                  type="button" 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 sm:p-2 text-gray-400 hover:text-blue-400 rounded-full hover:bg-white/10 transition-colors"
+                >
+                  <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+                <button 
+                  type="button" 
+                  onClick={() => folderInputRef.current?.click()}
+                  className="p-1.5 sm:p-2 text-gray-400 hover:text-amber-400 rounded-full hover:bg-white/10 transition-colors"
+                >
+                  <Folder className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </div>
 
               <select 
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="bg-[#212121] text-gray-200 border border-gray-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer appearance-none mr-2"
+                className="bg-transparent text-gray-300 border-none rounded-lg px-2 py-1 focus:outline-none focus:ring-0 cursor-pointer appearance-none ml-2 text-xs sm:text-sm max-w-[140px] truncate"
               >
                 <option className="bg-[#171717] text-gray-200" value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                <option className="bg-[#171717] text-gray-200" value="gpt-4o-mini">GPT-4o Mini - GitHub</option>
-                <option className="bg-[#171717] text-gray-200" value="Meta-Llama-3.1-70B-Instruct">Llama 3.1 70B - GitHub</option>
+                <option className="bg-[#171717] text-gray-200" value="gpt-4o-mini">GPT-4o Mini</option>
+                <option className="bg-[#171717] text-gray-200" value="Meta-Llama-3.1-70B-Instruct">Llama 3.1 70B</option>
               </select>
+            </div>
 
-              <input 
+            <div className="flex flex-1 items-end pt-1 sm:pt-0">
+              <textarea 
                 value={taskInput}
                 onChange={(e) => setTaskInput(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    runAction();
+                  }
+                }}
+                onInput={(e) => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = "auto";
+                  target.style.height = `${Math.min(target.scrollHeight, 150)}px`;
+                }}
                 placeholder="Balas pesan..." 
-                className="flex-1 bg-transparent text-gray-100 px-3 py-2.5 focus:outline-none placeholder-gray-500 text-[15px]"
-                disabled={isWorking}
+                rows={1}
+                className="flex-1 bg-transparent text-gray-100 px-3 py-2 sm:py-3 focus:outline-none placeholder-gray-500 text-[15px] resize-none max-h-[150px] overflow-y-auto"
               />
 
               <button 
                 onClick={() => runAction()}
-                disabled={isWorking || !taskInput.trim()}
-                className={`p-2.5 rounded-xl text-white transition-all duration-200 ml-1 ${
-                  isWorking || !taskInput.trim() 
-                    ? "bg-white/5 opacity-40" 
-                    : "bg-white text-black hover:bg-gray-200 scale-105 shadow-md"
-                }`}
-                title="Kirim"
+                disabled={isWorking || (!taskInput.trim() && attachments.length === 0)}
+                className="mb-1 sm:mb-1.5 mr-1 sm:mr-2 p-1.5 sm:p-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white transition-colors disabled:opacity-50 disabled:bg-white/10"
               >
                 <ArrowUp className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-center text-xs text-gray-500 mt-3 font-medium">
-              Agent AI dapat melakukan kesalahan. Harap periksa informasi penting.
-            </p>
           </div>
+          <p className="text-center text-[11px] text-gray-500 mt-2 font-medium hidden sm:block">
+            Agent AI dapat melakukan kesalahan. Harap periksa informasi penting.
+          </p>
         </div>
       )}
     </div>

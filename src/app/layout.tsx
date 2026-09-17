@@ -28,8 +28,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="id" className="dark">
-      <body className="flex h-screen overflow-hidden bg-[#171717] text-gray-100 font-sans antialiased">
+    <html lang="id" className="dark" suppressHydrationWarning>
+      <body 
+        className="flex h-screen overflow-hidden bg-[#171717] text-gray-100 font-sans antialiased"
+        suppressHydrationWarning
+      >
         <ChatProvider>
           <Sidebar />
           <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#212121] md:rounded-l-[2rem] border-l border-white/5 relative z-10 md:shadow-2xl">
