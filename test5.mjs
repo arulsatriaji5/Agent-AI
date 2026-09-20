@@ -1,0 +1,1 @@
+import { streamText } from 'ai'; import { google } from '@ai-sdk/google'; async function run(){ const r = await streamText({model: google('gemini-1.5-flash'), prompt: 'hi'}); let obj = r; while(obj) { console.log(Object.getOwnPropertyNames(obj)); obj = Object.getPrototypeOf(obj); } } run();  

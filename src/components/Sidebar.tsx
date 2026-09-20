@@ -210,12 +210,10 @@ export function Sidebar() {
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                <p className="font-semibold text-gray-200 mb-1">Status Eksekusi:</p>
-                <p className="text-emerald-400 flex items-center gap-1.5 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Aktif — Setiap Hari pk 08:00 WIB (01:00 UTC)
-                </p>
+              <div className="p-3 bg-white/5 rounded-xl border border-white/5 text-center py-6">
+                <CalendarClock className="w-8 h-8 text-gray-500 mx-auto mb-2 opacity-50" />
+                <p className="font-medium text-gray-400">Belum ada tugas yang terjadwal.</p>
+                <p className="text-gray-500 text-[11px] mt-1">Tugas otomatis (cron) akan muncul di sini.</p>
               </div>
 
               <div className="p-3 bg-[#1a1a1a] rounded-xl border border-white/5 space-y-1">

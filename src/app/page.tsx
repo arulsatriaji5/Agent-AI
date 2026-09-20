@@ -6,7 +6,9 @@ import { WorkMode } from "@/components/WorkMode";
 import { Menu } from "lucide-react";
 
 export default function App() {
-  const { activeMode, setActiveMode, setIsMobileSidebarOpen } = useChatContext();
+  const { activeMode, setActiveMode, setIsMobileSidebarOpen, activeSession } = useChatContext();
+  
+  const isConversationActive = activeSession && activeSession.messages && activeSession.messages.length > 0;
 
   return (
     <div className="flex flex-col h-full bg-[#212121] relative">
@@ -23,22 +25,24 @@ export default function App() {
         <div className="flex-1 flex justify-center">
           <div className="bg-[#171717] p-1 rounded-xl flex items-center gap-1 border border-white/5">
             <button
+              disabled={!!isConversationActive}
               onClick={() => setActiveMode("chat")}
               className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                 activeMode === "chat"
                   ? "bg-[#2f2f2f] text-white shadow-sm border border-white/10"
                   : "text-gray-400 hover:text-gray-200"
-              }`}
+              } ${isConversationActive ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
             >
               Chat
             </button>
             <button
+              disabled={!!isConversationActive}
               onClick={() => setActiveMode("work")}
               className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                 activeMode === "work"
                   ? "bg-[#2f2f2f] text-white shadow-sm border border-white/10"
                   : "text-gray-400 hover:text-gray-200"
-              }`}
+              } ${isConversationActive ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
             >
               Work
             </button>

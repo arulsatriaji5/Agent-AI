@@ -1,11 +1,21 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { google } from '@ai-sdk/google';
 
-// Custom provider untuk GitHub Models
-export const githubModels = createOpenAI({
-  baseURL: 'https://models.inference.ai.azure.com',
-  apiKey: process.env.GITHUB_TOKEN,
+// Groq provider — ultra-fast inference (Llama, Mixtral, etc.)
+export const groq = createOpenAI({
+  baseURL: 'https://api.groq.com/openai/v1',
+  apiKey: process.env.GROQ_API_KEY || '',
 });
 
-// Export instance google juga dari sini agar rapi
+// OpenRouter provider — access to hundreds of open-source models
+export const openRouter = createOpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY || '',
+  headers: {
+    'HTTP-Referer': 'https://agens-trading.com',
+    'X-Title': 'Agens Trading',
+  },
+});
+
+// Export Google provider
 export { google };

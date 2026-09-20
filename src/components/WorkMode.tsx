@@ -359,8 +359,8 @@ export function WorkMode() {
                   className="bg-transparent text-gray-300 border-none rounded-lg px-2 py-1 focus:outline-none focus:ring-0 cursor-pointer appearance-none ml-2 text-xs sm:text-sm max-w-[140px] truncate"
                 >
                   <option className="bg-[#171717] text-gray-200" value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                  <option className="bg-[#171717] text-gray-200" value="gpt-4o-mini">GPT-4o Mini</option>
-                  <option className="bg-[#171717] text-gray-200" value="Meta-Llama-3.1-70B-Instruct">Llama 3.1 70B</option>
+                  <option className="bg-[#171717] text-gray-200" value="llama-3.1-70b-versatile">Llama 3.1 70B — Groq ⚡</option>
+                  <option className="bg-[#171717] text-gray-200" value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B — Free</option>
                 </select>
               </div>
 
@@ -524,8 +524,8 @@ export function WorkMode() {
                 className="bg-transparent text-gray-300 border-none rounded-lg px-2 py-1 focus:outline-none focus:ring-0 cursor-pointer appearance-none ml-2 text-xs sm:text-sm max-w-[140px] truncate"
               >
                 <option className="bg-[#171717] text-gray-200" value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                <option className="bg-[#171717] text-gray-200" value="gpt-4o-mini">GPT-4o Mini</option>
-                <option className="bg-[#171717] text-gray-200" value="Meta-Llama-3.1-70B-Instruct">Llama 3.1 70B</option>
+                <option className="bg-[#171717] text-gray-200" value="llama-3.1-70b-versatile">Llama 3.1 70B — Groq ⚡</option>
+                <option className="bg-[#171717] text-gray-200" value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B — Free</option>
               </select>
             </div>
 
@@ -559,7 +559,7 @@ export function WorkMode() {
             </div>
           </div>
           <p className="text-center text-[11px] text-gray-500 mt-2 font-medium hidden sm:block">
-            Agent AI dapat melakukan kesalahan. Harap periksa informasi penting.
+            Agens dapat melakukan kesalahan. Harap periksa informasi penting.
           </p>
         </div>
       )}

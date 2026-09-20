@@ -7,7 +7,6 @@ import { getTursoClient, initDb } from "@/lib/turso";
 // Types
 // ---------------------------------------------------------------------------
 
-
 interface BinanceTicker {
   symbol: string;
   lastPrice: string;
@@ -18,7 +17,7 @@ interface BinanceTicker {
   quoteVolume: string;
 }
 
-interface GeminiAnalysis {
+interface AgensAnalysis {
   sentiment: "Bullish" | "Bearish" | "Neutral";
   summary: string;
   visual_prompt: string;
@@ -44,11 +43,11 @@ async function fetchBinanceData(): Promise<BinanceTicker> {
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — Analyse with Gemini 1.5 Flash via Vercel AI SDK
+// Step 2 — Analyse with Gemini via Vercel AI SDK
 // ---------------------------------------------------------------------------
-async function analyseWithGemini(ticker: BinanceTicker): Promise<GeminiAnalysis> {
+async function analyseWithAgens(ticker: BinanceTicker): Promise<AgensAnalysis> {
   const prompt = `
-You are a senior crypto-market analyst. Analyse the following real-time BTCUSDT market data and return your analysis **strictly** as a JSON object with three keys — no markdown fences, no extra text.
+You are Agens, a senior crypto-market analyst AI. Analyse the following real-time BTCUSDT market data and return your analysis **strictly** as a JSON object with three keys — no markdown fences, no extra text.
 
 Market Data:
 - Current Price : $${ticker.lastPrice}
@@ -73,9 +72,9 @@ Return ONLY the JSON object.
     maxTokens: 300,
   });
 
-  // Parse the JSON from Gemini's response (strip any accidental fences)
+  // Parse the JSON from response (strip any accidental fences)
   const cleaned = text.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
-  const parsed: GeminiAnalysis = JSON.parse(cleaned);
+  const parsed: AgensAnalysis = JSON.parse(cleaned);
 
   // Validate sentiment
   if (!["Bullish", "Bearish", "Neutral"].includes(parsed.sentiment)) {
@@ -99,7 +98,7 @@ function buildImageUrl(visualPrompt: string): string {
 async function saveReport(
   price: number,
   change24h: number,
-  analysis: GeminiAnalysis,
+  analysis: AgensAnalysis,
   imageUrl: string
 ) {
   const db = getTursoClient();
@@ -119,17 +118,17 @@ async function saveReport(
 }
 
 // ---------------------------------------------------------------------------
-// GET Handler — Cron endpoint
+// GET Handler — Cron endpoint (Vercel Cron / External Trigger)
 // ---------------------------------------------------------------------------
 export async function GET(request: NextRequest) {
   try {
-    // Optional: verify Vercel cron secret in production
-    // const authHeader = request.headers.get("authorization");
-    // if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    // }
+    // Verify Vercel cron secret in production
+    const authHeader = request.headers.get("authorization");
+    if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+      return new NextResponse("Unauthorized", { status: 401 });
+    }
 
-    console.log("🚀 [CRON] Starting financial research...");
+    console.log("🚀 [AGENS CRON] Starting autonomous financial research...");
 
     // 0) Initialize DB
     await initDb();
@@ -142,7 +141,7 @@ export async function GET(request: NextRequest) {
     console.log(`📊 BTC Price: $${price.toLocaleString()} | 24h: ${change24h}%`);
 
     // 2) AI analysis
-    const analysis = await analyseWithGemini(ticker);
+    const analysis = await analyseWithAgens(ticker);
     console.log(`🧠 Sentiment: ${analysis.sentiment}`);
     console.log(`📝 Summary: ${analysis.summary}`);
 
@@ -156,6 +155,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      message: "Agens autonomous research completed.",
       data: {
         asset: "BTCUSDT",
         price,
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("❌ [CRON] Research failed:", error);
+    console.error("❌ [AGENS CRON] Research failed:", error);
 
     return NextResponse.json(
       {

@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateText } from "ai";
-import { google, githubModels } from "@/lib/ai-providers";
+import { google } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
 import { getTursoClient, initDb } from "@/lib/turso";
 import { getQuote, getMarketNews } from "@/lib/finnhub";
+
+const groq = createOpenAI({
+  baseURL: 'https://api.groq.com/openai/v1',
+  apiKey: process.env.GROQ_API_KEY || '',
+});
+
+const openRouter = createOpenAI({
+  baseURL: 'https://openrouter.ai/api/v1',
+  apiKey: process.env.OPENROUTER_API_KEY || '',
+  headers: {
+    'HTTP-Referer': 'https://agens-trading.com',
+    'X-Title': 'Agens Trading',
+  },
+});
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -180,24 +195,19 @@ export async function POST(req: NextRequest) {
       : "";
 
     const requestedModel = body?.model || "gemini-2.5-flash";
-    
-    console.log("Menerima request dengan model:", requestedModel);
-    
+
+    console.log("[WORK] Request model:", requestedModel);
+
     let selectedModel;
-    switch (requestedModel) {
-      case 'gpt-4o-mini':
-      case 'Meta-Llama-3.1-70B-Instruct':
-        if (!process.env.GITHUB_TOKEN) {
-          throw new Error("GITHUB_TOKEN tidak ditemukan di environment variables");
-        }
-        selectedModel = githubModels(requestedModel);
-        break;
-      default:
-        if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
-          throw new Error("GOOGLE_GENERATIVE_AI_API_KEY tidak ditemukan");
-        }
-        selectedModel = google(requestedModel);
-        break;
+    if (requestedModel === 'llama-3.1-70b-versatile') {
+      if (!process.env.GROQ_API_KEY) throw new Error("GROQ_API_KEY tidak ditemukan");
+      selectedModel = groq(requestedModel);
+    } else if (requestedModel.includes(':free') || requestedModel.includes('openrouter')) {
+      if (!process.env.OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY tidak ditemukan");
+      selectedModel = openRouter(requestedModel);
+    } else {
+      if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) throw new Error("GOOGLE_GENERATIVE_AI_API_KEY tidak ditemukan");
+      selectedModel = google(requestedModel);
     }
 
     console.log("⚡ [WORK_MODE] Starting Autonomous Agent Pipeline with task:", userTask || "Default multi-market research");
@@ -274,7 +284,7 @@ export async function POST(req: NextRequest) {
     const sahamData = await fetchIndoStockQuotes();
 
     // 3. Autonomous Reasoning with Gemini
-    const systemPrompt = `Anda adalah Agent AI, Asisten Otonom Canggih.
+    const systemPrompt = `Anda adalah Agens, Autonomous Trading AI. Anda WAJIB menggunakan tools untuk menarik data pasar secara real-time, menganalisis saham/kripto, dan memberikan rekomendasi action (BUY/SELL/HOLD).
 Tugas Anda adalah bertindak sebagai Agentic Router: memahami maksud instruksi pengguna secara mendalam dan memutuskan jenis respons ("output_type").
 PENTING:
 1. JIKA pengguna HANYA bertanya informasi, analisis langsung, atau harga pasar (misal: "ihsg berapa", "apa itu AI", "prospek BBCA"), output_type Anda adalah "ANALYSIS". Anda JANGAN membuat carousel visual. Cukup berikan analisis tajam 2 paragraf di field "marketSummary".
@@ -424,7 +434,7 @@ GENERATE JSON DENGAN FORMAT BERIKUT SECARA KETAT:
         : "Bullish",
       sentimentScore: parsed.sentimentScore || 75,
       marketSummary: parsed.marketSummary || "Pasar memperlihatkan sentimen positif.",
-      coverHook: parsed.coverHook || "Riset Pasar Harian Agent AI",
+      coverHook: parsed.coverHook || "Riset Pasar Harian Agens",
       timestamp: new Date().toISOString(),
       cryptoData: {
         btc: { price: btcPrice, change24h: btcChange, volume: btcVol },

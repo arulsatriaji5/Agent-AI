@@ -1,7 +1,7 @@
 {
-  "name": "Agent AI - Financial Intelligence",
-  "short_name": "Agent AI",
-  "description": "AI-Powered Bitcoin, Crypto, & Saham Indo Autonomous Market Intelligence",
+  "name": "Agens Trading Assistant",
+  "short_name": "Agens",
+  "description": "Autonomous Trading AI — Analisis teknikal, tren pasar kripto, dan riset saham profesional.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

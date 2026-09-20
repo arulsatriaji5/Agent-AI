@@ -1,0 +1,1 @@
+import { streamText } from 'ai'; import { google } from '@ai-sdk/google'; async function run(){ const r = await streamText({model: google('gemini-1.5-flash'), prompt: 'hi'}); console.log(typeof r.toUIMessageStreamResponse, typeof r.toDataStreamResponse, typeof r.toTextStreamResponse); } run();  

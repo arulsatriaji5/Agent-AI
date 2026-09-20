@@ -12,13 +12,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Agent AI - Autonomous Financial & Market Intelligence",
-  description: "Asisten AI cerdas untuk analisis teknikal, tren pasar kripto, dan riset saham otonom.",
+  title: "Agens - Autonomous Trading & Market Intelligence",
+  description: "Agens: Asisten AI otonom untuk analisis teknikal, tren pasar kripto, dan riset saham profesional.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Agent AI",
+    title: "Agens",
   },
 };
 

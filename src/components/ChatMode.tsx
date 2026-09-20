@@ -34,15 +34,19 @@ export function ChatMode() {
 
   const {
     messages,
-    isLoading,
+    status,
     setMessages,
-    append,
+    sendMessage: append, // Alias to append to avoid changing other code
+    error,
   } = useChat({
     api: "/api/chat",
     body: {
       model: selectedModel,
-    }
+    },
+    onError: (err) => console.error("Error dari useChat:", err.message),
   });
+
+  const isLoading = status === "submitted" || status === "streaming";
 
   // Sync session changes from Sidebar (Load history)
   useEffect(() => {
@@ -180,16 +184,25 @@ export function ChatMode() {
                 >
                   {m.role === "assistant" ? (
                     <div className="whitespace-pre-wrap leading-relaxed">
-                      <ReactMarkdown
-                        components={{
-                          ul: ({node, ...props}) => <ul className="list-disc ml-4 space-y-1 my-2" {...props} />,
-                          ol: ({node, ...props}) => <ol className="list-decimal ml-4 space-y-1 my-2" {...props} />,
-                          strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
-                          p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />
-                        }}
-                      >
-                        {m.content}
-                      </ReactMarkdown>
+                      {!(m.content || (m.parts && m.parts.map((p: any) => p.type === 'text' ? p.text : '').join(''))) ? (
+                        <div className="text-red-400 italic text-sm border border-red-500/20 bg-red-500/10 p-3 rounded-xl flex items-center gap-2">
+                          <span className="text-lg">⚠️</span>
+                          <span>
+                            Gagal memproses respons. Model API mungkin sedang kelebihan beban (Overloaded). Silakan coba lagi atau pilih model lain.
+                          </span>
+                        </div>
+                      ) : (
+                        <ReactMarkdown
+                          components={{
+                            ul: ({node, ...props}) => <ul className="list-disc ml-4 space-y-1 my-2" {...props} />,
+                            ol: ({node, ...props}) => <ol className="list-decimal ml-4 space-y-1 my-2" {...props} />,
+                            strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
+                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />
+                          }}
+                        >
+                          {m.content || (m.parts && m.parts.map((p: any) => p.type === 'text' ? p.text : '').join('')) || ''}
+                        </ReactMarkdown>
+                      )}
                     </div>
                   ) : (
                     <div className="whitespace-pre-wrap leading-relaxed">
@@ -206,7 +219,7 @@ export function ChatMode() {
                            </div>
                          </div>
                       ) : (
-                        m.content
+                        m.content || (m.parts && m.parts.map((p: any) => p.type === 'text' ? p.text : '').join('')) || ''
                       )}
                     </div>
                   )}
@@ -215,7 +228,7 @@ export function ChatMode() {
                   {m.role === "assistant" && (
                     <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => copyToClipboard(m.content, m.id)}
+                        onClick={() => copyToClipboard(m.content || (m.parts && m.parts.map((p: any) => p.type === 'text' ? p.text : '').join('')) || '', m.id)}
                         className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-white transition-colors"
                         title="Salin jawaban"
                       >
@@ -238,7 +251,7 @@ export function ChatMode() {
                   {m.role === "user" && editingId !== m.id && (
                     <div className="mt-2 pt-2 border-t border-[#2563EB]/20 flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => copyToClipboard(m.content, m.id)}
+                        onClick={() => copyToClipboard(m.content || (m.parts && m.parts.map((p: any) => p.type === 'text' ? p.text : '').join('')) || '', m.id)}
                         className="flex items-center gap-1 text-[11px] text-blue-300/70 hover:text-blue-300 transition-colors"
                         title="Salin pesan"
                       >
@@ -397,8 +410,8 @@ export function ChatMode() {
               className="bg-transparent text-gray-300 border-none rounded-lg px-2 py-1 focus:outline-none focus:ring-0 cursor-pointer appearance-none ml-2 text-xs sm:text-sm max-w-[140px] truncate"
             >
               <option className="bg-[#171717] text-gray-200" value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-              <option className="bg-[#171717] text-gray-200" value="gpt-4o-mini">GPT-4o Mini</option>
-              <option className="bg-[#171717] text-gray-200" value="Meta-Llama-3.1-70B-Instruct">Llama 3.1 70B</option>
+              <option className="bg-[#171717] text-gray-200" value="llama-3.1-70b-versatile">Llama 3.1 70B — Groq ⚡</option>
+              <option className="bg-[#171717] text-gray-200" value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B — OpenRouter Free</option>
             </select>
           </div>
 
@@ -431,7 +444,7 @@ export function ChatMode() {
           </div>
         </form>
         <p className="text-center text-xs text-gray-500 mt-3 font-medium hidden sm:block">
-          AI dapat membuat kesalahan. Harap periksa info penting.
+          Agens dapat membuat kesalahan. Harap periksa info penting.
         </p>
       </div>
     </div>
