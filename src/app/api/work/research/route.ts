@@ -103,6 +103,28 @@ async function fetchBinanceTicker(symbol: string): Promise<BinanceTicker | null>
   }
 }
 
+// Forex / saham global via Yahoo Finance (gratis, tanpa API key)
+async function fetchYahooFinance(symbol: string): Promise<{ symbol: string; price: number; previousClose: number; currency: string } | null> {
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`,
+      { cache: 'no-store', headers: { 'Accept': 'application/json' } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const meta = data?.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+    return {
+      symbol: meta.symbol,
+      price: meta.regularMarketPrice,
+      previousClose: meta.previousClose || meta.chartPreviousClose || 0,
+      currency: meta.currency || 'USD',
+    };
+  } catch {
+    return null;
+  }
+}
+
 async function fetchIndoStockQuotes(): Promise<StockQuote[]> {
   // Try fetching real quotes from Yahoo Finance or fallback to robust market snapshot
   const stocks = [
@@ -199,7 +221,7 @@ export async function POST(req: NextRequest) {
     console.log("[WORK] Request model:", requestedModel);
 
     let selectedModel;
-    if (requestedModel === 'llama-3.1-70b-versatile') {
+    if (requestedModel === 'llama3-70b-8192' || requestedModel === 'llama-3.3-70b-versatile') {
       if (!process.env.GROQ_API_KEY) throw new Error("GROQ_API_KEY tidak ditemukan");
       selectedModel = groq(requestedModel);
     } else if (requestedModel.includes(':free') || requestedModel.includes('openrouter')) {
@@ -235,6 +257,12 @@ export async function POST(req: NextRequest) {
       detectedSymbol = "AAPL";
     } else if (u.includes("MSFT")) {
       detectedSymbol = "MSFT";
+    } else if (
+      u.includes("RUPIAH") || u.includes("IDR") || u.includes("USDIDR") ||
+      u.includes("NILAI TUKAR") || u.includes("KURS")
+    ) {
+      detectedSymbol = "USDIDR=X";
+      finnhubCategory = "forex";
     }
 
     let finnhubRealtime: any = null;
@@ -283,14 +311,22 @@ export async function POST(req: NextRequest) {
     // 2. Fetch Indonesian Stock Data (IHSG & Big Banks)
     const sahamData = await fetchIndoStockQuotes();
 
+    // 2b. Fetch USDIDR Forex data from Yahoo Finance (always)
+    const usdIdrData = await fetchYahooFinance("USDIDR=X");
+
     // 3. Autonomous Reasoning with Gemini
-    const systemPrompt = `Anda adalah Agens, Autonomous Trading AI. Anda WAJIB menggunakan tools untuk menarik data pasar secara real-time, menganalisis saham/kripto, dan memberikan rekomendasi action (BUY/SELL/HOLD).
-Tugas Anda adalah bertindak sebagai Agentic Router: memahami maksud instruksi pengguna secara mendalam dan memutuskan jenis respons ("output_type").
-PENTING:
-1. JIKA pengguna HANYA bertanya informasi, analisis langsung, atau harga pasar (misal: "ihsg berapa", "apa itu AI", "prospek BBCA"), output_type Anda adalah "ANALYSIS". Anda JANGAN membuat carousel visual. Cukup berikan analisis tajam 2 paragraf di field "marketSummary".
-2. JIKA pengguna secara eksplisit meminta pembuatan KONTEN, CAROUSEL, PRESENTASI, atau menekan tombol Riset Harian, output_type Anda adalah "CAROUSEL". Buat 3-5 slide.
-3. JIKA pengguna meminta SCANNING, DETEKSI SINYAL, atau "Scan Sinyal Bullish", output_type Anda adalah "SCANNER". Temukan aset dari DATA PASAR yang berpotensi naik/bullish dan masukkan ke field "signals".
-4. Anda WAJIB mengembalikan HANYA objek JSON yang valid tanpa backticks markdown.`;
+    const systemPrompt = `Anda adalah 'Agens', Autonomous Trading AI profesional.
+ATURAN KETAT UNTUK MODE WORK:
+1. DILARANG KERAS memberikan teori ekonomi dasar, paragraf panjang yang bertele-tele, atau jawaban mengambang.
+2. SELALU gunakan data, angka, dan probabilitas. Jika ditanya prediksi nilai tukar atau saham, berikan angka target (misal: "Proyeksi analis: Rp15.500 - Rp16.200").
+3. WAJIB menggunakan format Poin-Poin (Bullet Points) yang tajam dan langsung pada intinya.
+4. SELALU gunakan data real-time yang sudah disediakan dalam konteks sebelum menjawab. Data ini sudah di-fetch secara otomatis.
+5. Jika data tidak tersedia di konteks, JANGAN mengarang jawaban. Katakan dengan tegas: "Data real-time untuk aset ini belum terintegrasi di sistem saya."
+6. Tugas Anda adalah bertindak sebagai Agentic Router: memahami maksud instruksi pengguna dan memutuskan jenis respons ("output_type"):
+   - "ANALYSIS": Jika pengguna bertanya harga, prediksi, prospek, atau analisis langsung.
+   - "CAROUSEL": Jika pengguna meminta konten, presentasi, atau laporan visual.
+   - "SCANNER": Jika pengguna meminta scanning sinyal atau deteksi aset bullish.
+7. Anda WAJIB mengembalikan HANYA objek JSON yang valid tanpa backticks markdown.`;
 
     const userPrompt = `
 ${historyContext ? `KONTEKS OBROLAN SEBELUMNYA:\n${historyContext}\n\n` : ""}
@@ -310,6 +346,7 @@ DATA PASAR UMUM (Gunakan untuk menjawab pertanyaan, analisis, atau scanner):
 - Ethereum: $${ethPrice.toLocaleString()} (${ethChange > 0 ? "+" : ""}${ethChange}%)
 - Solana: $${solPrice.toLocaleString()} (${solChange > 0 ? "+" : ""}${solChange}%)
 - Saham Indo: ${sahamData.map((s) => `${s.symbol} Rp${s.price.toLocaleString()} (${s.changePercent > 0 ? "+" : ""}${s.changePercent}%)`).join(", ")}
+${usdIdrData ? `- Kurs USD/IDR (Rupiah): Rp${usdIdrData.price.toLocaleString("id-ID", {minimumFractionDigits: 0})} per USD (Prev Close: Rp${usdIdrData.previousClose.toLocaleString("id-ID")})` : "- Kurs USD/IDR: Data tidak tersedia saat ini."}
 
 GENERATE JSON DENGAN FORMAT BERIKUT SECARA KETAT:
 {

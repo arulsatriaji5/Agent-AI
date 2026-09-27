@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
     let activeModel;
 
-    if (selectedModelString === 'llama-3.1-70b-versatile') {
+    if (selectedModelString === 'llama3-70b-8192' || selectedModelString === 'llama-3.3-70b-versatile') {
       if (!process.env.GROQ_API_KEY) throw new Error("GROQ_API_KEY tidak ditemukan");
       activeModel = groq(selectedModelString);
     } else if (selectedModelString.includes(':free') || selectedModelString.includes('openrouter')) {
