@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useChat } from "@ai-sdk/react";
-import { Send, Bot, User, Copy, Check, Edit2, X, Paperclip, Folder, FileText, Image as ImageIcon, Trash2 } from "lucide-react";
+import { Send, Bot, SendHorizontal, User, Copy, Check, Edit2, X, Plus, Folder, FileText, Image as ImageIcon, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import Image from "next/image";
 import { useChatContext, type ChatMessage } from "@/context/ChatContext";
 
 export function ChatMode() {
@@ -27,6 +28,7 @@ export function ChatMode() {
   const [folderName, setFolderName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const prevSessionIdRef = useRef<string | null>(activeSessionId);
@@ -36,7 +38,7 @@ export function ChatMode() {
     messages,
     status,
     setMessages,
-    sendMessage: append, // Alias to append to avoid changing other code
+    sendMessage: append,
     error,
   } = useChat({
     api: "/api/chat",
@@ -66,7 +68,7 @@ export function ChatMode() {
     }
   }, [activeSessionId, activeSession, setMessages]);
 
-  // Sync messages TO local context whenever they change (Fixes retention!)
+  // Sync messages TO local context whenever they change
   useEffect(() => {
     if (messages.length > 0) {
       saveOrUpdateSession(activeSessionId, messages.map(m => ({
@@ -103,7 +105,6 @@ export function ChatMode() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    // Set folder name based on first file's path
     const firstPath = files[0].webkitRelativePath;
     const fName = firstPath ? firstPath.split('/')[0] : "Folder Proyek";
     setFolderName(fName);
@@ -113,7 +114,6 @@ export function ChatMode() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      // Skip heavy or binary files
       if (
         file.name.includes('.git') || 
         file.webkitRelativePath.includes('.git/') ||
@@ -124,7 +124,7 @@ export function ChatMode() {
         continue;
       }
 
-      if (file.size > 500 * 1024) continue; // Skip files > 500KB
+      if (file.size > 500 * 1024) continue;
 
       try {
         const text = await file.text();
@@ -140,55 +140,52 @@ export function ChatMode() {
     } else {
       setFolderName("");
     }
-    // Reset input
     if (folderInputRef.current) folderInputRef.current.value = '';
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#212121] relative">
-      {/* Messages Scroll Area - FIXED SCROLLING AND RETENTION CONTAINER */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-4 scrollbar-none pt-4">
+    <div className="flex flex-col h-full bg-white dark:bg-[#131314] relative transition-colors duration-300">
+      {/* Messages Scroll Area */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-4 scrollbar-none">
         <div className="max-w-3xl mx-auto w-full space-y-6">
+
+          {/* GEMINI-STYLE EMPTY STATE */}
           {messages.length === 0 ? (
-            <div className="h-full min-h-[360px] flex flex-col items-center justify-center text-center opacity-70">
-              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4 shadow-md">
-                <Bot className="w-8 h-8 text-gray-300" />
-              </div>
-              <h2 className="text-xl font-semibold text-gray-200">
-                Bagaimana saya bisa membantu?
-              </h2>
-              <p className="text-gray-400 mt-2 text-sm max-w-sm">
-                Tanyakan apa saja, mulai dari analisis kripto hingga bantuan coding.
-              </p>
+            <div className="h-full min-h-[50vh] flex flex-col items-center justify-center text-center px-4">
+              <h1 className="text-3xl md:text-5xl font-medium text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-sky-400 dark:from-blue-400 dark:to-sky-200 mb-4 leading-tight animate-fade-in">
+                Apa yang bisa saya bantu, Satriaji?
+              </h1>
             </div>
           ) : (
             messages.map((m) => (
               <div
                 key={m.id}
-                className={`flex gap-4 ${
+                className={`flex gap-3 ${
                   m.role === "user" ? "justify-end" : "justify-start"
-                }`}
+                } animate-fade-in`}
               >
                 {m.role === "assistant" && (
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Bot className="w-5 h-5 text-gray-300" />
+                  <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="relative w-6 h-6">
+                      <Image src="/logo_1.png" alt="Agens" fill className="object-contain" />
+                    </div>
                   </div>
                 )}
 
                 <div
-                  className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-5 py-3.5 text-sm group relative ${
+                  className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm group relative ${
                     m.role === "user"
-                      ? "bg-[#2563EB]/20 text-blue-100 border border-[#2563EB]/30"
-                      : "bg-white/5 text-gray-200"
+                      ? "bg-blue-50 dark:bg-[#2b2d30] text-gray-900 dark:text-gray-100 border border-blue-100 dark:border-transparent"
+                      : "bg-transparent text-gray-800 dark:text-gray-200"
                   }`}
                 >
                   {m.role === "assistant" ? (
                     <div className="whitespace-pre-wrap leading-relaxed">
                       {!(m.content || (m.parts && m.parts.map((p: any) => p.type === 'text' ? p.text : '').join(''))) ? (
-                        <div className="text-red-400 italic text-sm border border-red-500/20 bg-red-500/10 p-3 rounded-xl flex items-center gap-2">
-                          <span className="text-lg">⚠️</span>
+                        <div className="text-red-500 italic text-sm border border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10 p-3 rounded-xl flex items-center gap-2">
+                          <span className="text-lg">??</span>
                           <span>
-                            Gagal memproses respons. Model API mungkin sedang kelebihan beban (Overloaded). Silakan coba lagi atau pilih model lain.
+                            Gagal memproses respons. Model API mungkin sedang kelebihan beban. Silakan coba lagi atau pilih model lain.
                           </span>
                         </div>
                       ) : (
@@ -196,7 +193,7 @@ export function ChatMode() {
                           components={{
                             ul: ({node, ...props}) => <ul className="list-disc ml-4 space-y-1 my-2" {...props} />,
                             ol: ({node, ...props}) => <ol className="list-decimal ml-4 space-y-1 my-2" {...props} />,
-                            strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
+                            strong: ({node, ...props}) => <strong className="font-bold text-gray-900 dark:text-white" {...props} />,
                             p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />
                           }}
                         >
@@ -211,10 +208,10 @@ export function ChatMode() {
                            <textarea 
                              value={editContent}
                              onChange={(e) => setEditContent(e.target.value)}
-                             className="w-full bg-black/30 border border-blue-500/50 rounded-lg p-2 text-gray-100 focus:outline-none resize-none min-h-[80px]"
+                             className="w-full bg-white dark:bg-black/30 border border-blue-300 dark:border-blue-500/50 rounded-lg p-2 text-gray-900 dark:text-gray-100 focus:outline-none resize-none min-h-[80px]"
                            />
                            <div className="flex items-center justify-end gap-2">
-                             <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors">Batal</button>
+                             <button onClick={() => setEditingId(null)} className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors">Batal</button>
                              <button onClick={handleEditSubmit} className="px-3 py-1.5 text-xs font-semibold bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors">Kirim Ulang</button>
                            </div>
                          </div>
@@ -226,16 +223,16 @@ export function ChatMode() {
 
                   {/* Assistant Hover Action */}
                   {m.role === "assistant" && (
-                    <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="mt-2 pt-2 border-t border-gray-200 dark:border-white/5 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => copyToClipboard(m.content || (m.parts && m.parts.map((p: any) => p.type === 'text' ? p.text : '').join('')) || '', m.id)}
-                        className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-white transition-colors"
+                        className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-700 dark:hover:text-white transition-colors"
                         title="Salin jawaban"
                       >
                         {copiedId === m.id ? (
                           <>
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="text-emerald-400">Tersalin</span>
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-emerald-500">Tersalin</span>
                           </>
                         ) : (
                           <>
@@ -247,18 +244,18 @@ export function ChatMode() {
                     </div>
                   )}
 
-                  {/* User Hover Actions (Edit & Copy) */}
+                  {/* User Hover Actions */}
                   {m.role === "user" && editingId !== m.id && (
-                    <div className="mt-2 pt-2 border-t border-[#2563EB]/20 flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="mt-2 pt-2 border-t border-blue-100 dark:border-white/10 flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={() => copyToClipboard(m.content || (m.parts && m.parts.map((p: any) => p.type === 'text' ? p.text : '').join('')) || '', m.id)}
-                        className="flex items-center gap-1 text-[11px] text-blue-300/70 hover:text-blue-300 transition-colors"
+                        className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                         title="Salin pesan"
                       >
                         {copiedId === m.id ? (
                           <>
-                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                            <span className="text-emerald-400">Tersalin</span>
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <span className="text-emerald-500">Tersalin</span>
                           </>
                         ) : (
                           <>
@@ -272,7 +269,7 @@ export function ChatMode() {
                           setEditingId(m.id);
                           setEditContent(m.content);
                         }}
-                        className="flex items-center gap-1 text-[11px] text-blue-300/70 hover:text-blue-300 transition-colors"
+                        className="flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                         title="Edit pesan"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -283,8 +280,8 @@ export function ChatMode() {
                 </div>
 
                 {m.role === "user" && (
-                  <div className="w-8 h-8 rounded-full bg-[#2563EB]/20 flex items-center justify-center flex-shrink-0 border border-[#2563EB]/30 mt-0.5">
-                    <User className="w-5 h-5 text-blue-300" />
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center flex-shrink-0 mt-1 text-white text-[10px] font-bold">
+                    S
                   </div>
                 )}
               </div>
@@ -293,20 +290,16 @@ export function ChatMode() {
 
           {/* Loading Bubble */}
           {isLoading && (
-            <div className="flex gap-4 justify-start animate-pulse">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
-                <Bot className="w-5 h-5 text-gray-300" />
+            <div className="flex gap-3 justify-start animate-pulse">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0">
+                <div className="relative w-6 h-6">
+                  <Image src="/logo_1.png" alt="Agens" fill className="object-contain" />
+                </div>
               </div>
-              <div className="bg-white/5 rounded-2xl px-5 py-4 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-gray-400 animate-bounce" />
-                <div
-                  className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
-                  style={{ animationDelay: "0.2s" }}
-                />
-                <div
-                  className="w-2 h-2 rounded-full bg-gray-400 animate-bounce"
-                  style={{ animationDelay: "0.4s" }}
-                />
+              <div className="rounded-2xl px-5 py-4 flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce" />
+                <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce" style={{ animationDelay: "0.2s" }} />
+                <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500 animate-bounce" style={{ animationDelay: "0.4s" }} />
               </div>
             </div>
           )}
@@ -315,26 +308,26 @@ export function ChatMode() {
         </div>
       </div>
 
-      {/* Input Bar */}
-      <div className="w-full p-3 sm:p-6 bg-[#212121] border-t border-white/5 z-10 shrink-0 shadow-[0_-10px_40px_rgba(33,33,33,0.8)]">
+      {/* GEMINI-STYLE INPUT BAR */}
+      <div className="w-full px-3 sm:px-6 pb-4 pt-2 z-10 shrink-0">
         
         {/* Upload previews */}
         {(attachments.length > 0 || folderName) && (
           <div className="max-w-3xl mx-auto flex flex-wrap gap-2 mb-3 px-2">
             {attachments.map((file, idx) => (
-              <div key={idx} className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg text-sm text-gray-200">
-                <ImageIcon className="w-4 h-4 text-blue-400" />
+              <div key={idx} className="flex items-center gap-2 bg-gray-100 dark:bg-white/10 px-3 py-1.5 rounded-full text-sm text-gray-700 dark:text-gray-200">
+                <ImageIcon className="w-4 h-4 text-blue-500" />
                 <span className="truncate max-w-[120px]">{file.name}</span>
-                <button type="button" onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-400 ml-1">
+                <button type="button" onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))} className="text-gray-400 hover:text-red-500 ml-1">
                   <X className="w-4 h-4" />
                 </button>
               </div>
             ))}
             {folderName && (
-              <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg text-sm text-gray-200">
-                <Folder className="w-4 h-4 text-amber-400" />
+              <div className="flex items-center gap-2 bg-gray-100 dark:bg-white/10 px-3 py-1.5 rounded-full text-sm text-gray-700 dark:text-gray-200">
+                <Folder className="w-4 h-4 text-amber-500" />
                 <span className="truncate max-w-[150px]">{folderName}</span>
-                <button type="button" onClick={() => { setFolderName(""); setFolderContext(""); }} className="text-gray-400 hover:text-red-400 ml-1">
+                <button type="button" onClick={() => { setFolderName(""); setFolderContext(""); }} className="text-gray-400 hover:text-red-500 ml-1">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -343,27 +336,8 @@ export function ChatMode() {
         )}
 
         {/* Hidden inputs */}
-        <input 
-          type="file" 
-          multiple 
-          accept="image/*" 
-          ref={fileInputRef} 
-          className="hidden" 
-          onChange={(e) => {
-            if (e.target.files) {
-              setAttachments(prev => [...prev, ...Array.from(e.target.files!)]);
-            }
-          }} 
-        />
-        <input 
-          type="file" 
-          /* @ts-expect-error */
-          webkitdirectory="" 
-          directory="" 
-          ref={folderInputRef} 
-          className="hidden" 
-          onChange={processFolder} 
-        />
+        <input type="file" multiple accept="image/*" ref={fileInputRef} className="hidden" onChange={(e) => { if (e.target.files) { setAttachments(prev => [...prev, ...Array.from(e.target.files!)]); } }} />
+        <input type="file" /* @ts-expect-error */ webkitdirectory="" directory="" ref={folderInputRef} className="hidden" onChange={processFolder} />
 
         <form
           ref={formRef}
@@ -382,68 +356,83 @@ export function ChatMode() {
               setFolderName("");
             }
           }}
-          className="max-w-3xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center bg-[#2f2f2f] rounded-2xl border border-white/10 focus-within:border-white/20 transition-colors shadow-lg p-1 sm:p-0"
+          className="max-w-3xl mx-auto flex items-end bg-gray-100 dark:bg-[#1e1f20] rounded-[28px] border border-gray-200/80 dark:border-[#3c4043]/80 focus-within:border-blue-400/50 dark:focus-within:border-blue-400/30 transition-all shadow-sm hover:shadow-md p-1.5"
         >
-          <div className="flex items-center justify-between sm:justify-start border-b sm:border-b-0 sm:border-r border-white/10 px-2 py-2 sm:py-0">
-            <div className="flex items-center gap-1">
-              <button 
-                type="button" 
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 text-gray-400 hover:text-blue-400 rounded-full hover:bg-white/10 transition-colors"
-                title="Unggah Gambar"
-              >
-                <ImageIcon className="w-5 h-5" />
-              </button>
-              <button 
-                type="button" 
-                onClick={() => folderInputRef.current?.click()}
-                className="p-2 text-gray-400 hover:text-amber-400 rounded-full hover:bg-white/10 transition-colors"
-                title="Unggah Folder Proyek"
-              >
-                <Folder className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="bg-transparent text-gray-300 border-none rounded-lg px-2 py-1 focus:outline-none focus:ring-0 cursor-pointer appearance-none ml-2 text-xs sm:text-sm max-w-[140px] truncate"
+          {/* Plus / Attachment Button */}
+          <div className="relative">
+            <button 
+              type="button" 
+              onClick={() => setShowAttachMenu(!showAttachMenu)}
+              className="p-2.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/10 rounded-full transition-colors"
+              title="Lampiran"
             >
-              <option className="bg-[#171717] text-gray-200" value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-              <option className="bg-[#171717] text-gray-200" value="llama3-70b-8192">Llama 3 70B — Groq ⚡</option>
-              <option className="bg-[#171717] text-gray-200" value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B — OpenRouter Free</option>
-            </select>
+              <Plus className="w-5 h-5" />
+            </button>
+
+            {/* Attach dropdown */}
+            {showAttachMenu && (
+              <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-[#2b2d30] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl py-1 w-48 z-50">
+                <button
+                  type="button"
+                  onClick={() => { fileInputRef.current?.click(); setShowAttachMenu(false); }}
+                  className="flex items-center gap-3 px-4 py-2.5 w-full text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                >
+                  <ImageIcon className="w-4 h-4 text-blue-500" />
+                  <span>Unggah Gambar</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { folderInputRef.current?.click(); setShowAttachMenu(false); }}
+                  className="flex items-center gap-3 px-4 py-2.5 w-full text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                >
+                  <Folder className="w-4 h-4 text-amber-500" />
+                  <span>Unggah Folder</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-1 items-end pt-2 sm:pt-0">
-            <textarea
-              value={localInput}
-              onChange={(e) => setLocalInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  formRef.current?.requestSubmit();
-                }
-              }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = "auto";
-                target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
-              }}
-              placeholder="Tanyakan sesuatu... (Shift+Enter untuk baris baru)"
-              rows={1}
-              className="flex-1 bg-transparent text-gray-100 px-4 py-3 focus:outline-none placeholder-gray-500 text-sm resize-none max-h-[200px] overflow-y-auto"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || (!localInput.trim() && attachments.length === 0)}
-              className="mb-1.5 mr-2 p-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-white transition-colors disabled:opacity-50 disabled:bg-white/10 disabled:cursor-not-allowed"
-            >
-              <Send className="w-5 h-5" />
-            </button>
-          </div>
+          {/* Text Input */}
+          <textarea
+            value={localInput}
+            onChange={(e) => setLocalInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                formRef.current?.requestSubmit();
+              }
+            }}
+            onInput={(e) => {
+              const target = e.target as HTMLTextAreaElement;
+              target.style.height = "auto";
+              target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
+            }}
+            placeholder="Tanyakan sesuatu kepada Agens..."
+            rows={1}
+            className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 px-2 py-2.5 focus:outline-none placeholder-gray-400 dark:placeholder-gray-500 text-sm resize-none max-h-[200px] overflow-y-auto"
+          />
+
+          {/* Model Selector */}
+          <select
+            value={selectedModel}
+            onChange={(e) => setSelectedModel(e.target.value)}
+            className="bg-transparent text-gray-500 dark:text-gray-400 border-none px-1 py-1 focus:outline-none focus:ring-0 cursor-pointer text-xs max-w-[100px] truncate hidden sm:block"
+          >
+            <option className="bg-white dark:bg-[#1e1f20]" value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+            <option className="bg-white dark:bg-[#1e1f20]" value="llama3-70b-8192">Llama 3 70B</option>
+            <option className="bg-white dark:bg-[#1e1f20]" value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B Free</option>
+          </select>
+
+          {/* Send Button */}
+          <button
+            type="submit"
+            disabled={isLoading || (!localInput.trim() && attachments.length === 0)}
+            className="p-2.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            <Send className="w-5 h-5" />
+          </button>
         </form>
-        <p className="text-center text-xs text-gray-500 mt-3 font-medium hidden sm:block">
+        <p className="text-center text-[11px] text-gray-400 dark:text-gray-500 mt-3 hidden sm:block">
           Agens dapat membuat kesalahan. Harap periksa info penting.
         </p>
       </div>

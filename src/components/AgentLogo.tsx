@@ -11,15 +11,15 @@ interface AgentLogoProps {
 
 export function AgentLogo({ className = "", size = "md", showText = true }: AgentLogoProps) {
   const iconSizeClass = {
-    sm: "w-7 h-7",
-    md: "w-8 h-8",
-    lg: "w-10 h-10",
+    sm: "w-8 h-8",
+    md: "w-10 h-10",
+    lg: "w-12 h-12",
   }[size];
 
   const textSizeClass = {
-    sm: "text-base",
-    md: "text-lg",
-    lg: "text-xl",
+    sm: "text-lg",
+    md: "text-xl",
+    lg: "text-2xl",
   }[size];
 
   return (
