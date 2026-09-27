@@ -44,7 +44,7 @@ export default function App() {
                   : "text-gray-400 hover:text-gray-200"
               } ${isConversationActive ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
             >
-              Work
+              Agens
             </button>
           </div>
         </div>

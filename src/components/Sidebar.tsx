@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useChatContext } from "@/context/ChatContext";
 import { AgentLogo } from "@/components/AgentLogo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Sidebar() {
   const {
@@ -160,6 +161,7 @@ export function Sidebar() {
             <p className="text-sm font-medium text-gray-200 truncate">Satriaji</p>
             <p className="text-xs text-gray-500 truncate">Pro Plan</p>
           </div>
+          <ThemeToggle />
           <Settings className="w-4 h-4 text-gray-400" />
         </div>
       </div>

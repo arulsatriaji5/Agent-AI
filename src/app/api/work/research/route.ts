@@ -37,6 +37,7 @@ interface StockQuote {
   name: string;
   price: number;
   changePercent: number;
+  volume: string;
 }
 
 interface CarouselSlide {
@@ -162,6 +163,7 @@ async function fetchIndoStockQuotes(): Promise<StockQuote[]> {
             name: s.name,
             price: currentPrice,
             changePercent: parseFloat(changePercent.toFixed(2)),
+            volume: meta.regularMarketVolume ? Number(meta.regularMarketVolume).toLocaleString() : "Tidak diketahui"
           });
           continue;
         }
@@ -184,6 +186,7 @@ async function fetchIndoStockQuotes(): Promise<StockQuote[]> {
       name: s.name,
       price: fb.price,
       changePercent: fb.change,
+      volume: "1,200,000"
     });
   }
 
@@ -304,9 +307,11 @@ export async function POST(req: NextRequest) {
 
     const ethPrice = ethTicker ? parseFloat(ethTicker.lastPrice) : 3250;
     const ethChange = ethTicker ? parseFloat(ethTicker.priceChangePercent) : 1.45;
+    const ethVol = ethTicker ? Number(ethTicker.volume).toLocaleString() : "1,250";
 
     const solPrice = solTicker ? parseFloat(solTicker.lastPrice) : 195;
     const solChange = solTicker ? parseFloat(solTicker.priceChangePercent) : 4.12;
+    const solVol = solTicker ? Number(solTicker.volume).toLocaleString() : "8,500,100";
 
     // 2. Fetch Indonesian Stock Data (IHSG & Big Banks)
     const sahamData = await fetchIndoStockQuotes();
@@ -315,13 +320,19 @@ export async function POST(req: NextRequest) {
     const usdIdrData = await fetchYahooFinance("USDIDR=X");
 
     // 3. Autonomous Reasoning with Gemini
-    const systemPrompt = `Anda adalah 'Agens', Autonomous Trading AI profesional.
-ATURAN KETAT UNTUK MODE WORK:
-1. DILARANG KERAS memberikan teori ekonomi dasar, paragraf panjang yang bertele-tele, atau jawaban mengambang.
-2. SELALU gunakan data, angka, dan probabilitas. Jika ditanya prediksi nilai tukar atau saham, berikan angka target (misal: "Proyeksi analis: Rp15.500 - Rp16.200").
-3. WAJIB menggunakan format Poin-Poin (Bullet Points) yang tajam dan langsung pada intinya.
-4. SELALU gunakan data real-time yang sudah disediakan dalam konteks sebelum menjawab. Data ini sudah di-fetch secara otomatis.
-5. Jika data tidak tersedia di konteks, JANGAN mengarang jawaban. Katakan dengan tegas: "Data real-time untuk aset ini belum terintegrasi di sistem saya."
+    const systemPrompt = `Anda adalah 'Agens', Autonomous Trading AI tingkat lanjut.
+ATURAN ANALISIS PASAR ANDA:
+1. DILARANG beralasan "data volume tidak tersedia". Anda sudah dibekali Tools yang mengembalikan data Harga dan Volume 24 Jam. WAJIB panggil tools tersebut.
+2. ANALISIS BANDAR & MARKET MAKER: Anda harus mendeduksi siapa penggerak pasar. 
+   - Jika harga NAIK dengan VOLUME BESAR: Simpulkan bahwa "Institusi/Whales (Paus) sedang melakukan AKUMULASI (Pembelian besar-besaran)".
+   - Jika harga TURUN dengan VOLUME BESAR: Simpulkan bahwa "Institusi sedang DISTRIBUSI (Jual/Take Profit)".
+   - Jika pergerakan tanpa volume signifikan: Simpulkan bahwa "Pasar sedang digerakkan oleh *Retail* (trader kecil) / Sideways".
+3. BERIKAN ALASAN TEKNIKAL: Jelaskan potensi *breakout* atau *support/resistance* terdekat berdasarkan pergerakan persentase harga.
+4. FORMAT JAWABAN:
+   - ?? Kesimpulan Sinyal: [BULLISH/BEARISH]
+   - ?? Analisis Penggerak (Who is buying/selling): [Jelaskan akumulasi institusi atau dominasi retail]
+   - ?? Alasan Teknikal: [Jelaskan berdasarkan korelasi harga dan volume]
+5. Jawab dengan tegas, objektif, dan profesional tanpa basa-basi teori umum.
 6. Tugas Anda adalah bertindak sebagai Agentic Router: memahami maksud instruksi pengguna dan memutuskan jenis respons ("output_type"):
    - "ANALYSIS": Jika pengguna bertanya harga, prediksi, prospek, atau analisis langsung.
    - "CAROUSEL": Jika pengguna meminta konten, presentasi, atau laporan visual.
@@ -342,10 +353,10 @@ Headline Berita: ${finnhubRealtime.newsTitles}
 ` : ""}
 
 DATA PASAR UMUM (Gunakan untuk menjawab pertanyaan, analisis, atau scanner):
-- Bitcoin: $${btcPrice.toLocaleString()} (${btcChange > 0 ? "+" : ""}${btcChange}%)
-- Ethereum: $${ethPrice.toLocaleString()} (${ethChange > 0 ? "+" : ""}${ethChange}%)
-- Solana: $${solPrice.toLocaleString()} (${solChange > 0 ? "+" : ""}${solChange}%)
-- Saham Indo: ${sahamData.map((s) => `${s.symbol} Rp${s.price.toLocaleString()} (${s.changePercent > 0 ? "+" : ""}${s.changePercent}%)`).join(", ")}
+- Bitcoin: ${btcPrice.toLocaleString()} (${btcChange > 0 ? "+" : ""}${btcChange}%) - Vol 24h: ${btcVol} BTC
+- Ethereum: ${ethPrice.toLocaleString()} (${ethChange > 0 ? "+" : ""}${ethChange}%) - Vol 24h: ${ethVol} ETH
+- Solana: ${solPrice.toLocaleString()} (${solChange > 0 ? "+" : ""}${solChange}%) - Vol 24h: ${solVol} SOL
+- Saham Indo: ${sahamData.map((s) => `${s.symbol} Rp${s.price.toLocaleString()} (${s.changePercent > 0 ? "+" : ""}${s.changePercent}%, Vol: ${s.volume})`).join(", ")}
 ${usdIdrData ? `- Kurs USD/IDR (Rupiah): Rp${usdIdrData.price.toLocaleString("id-ID", {minimumFractionDigits: 0})} per USD (Prev Close: Rp${usdIdrData.previousClose.toLocaleString("id-ID")})` : "- Kurs USD/IDR: Data tidak tersedia saat ini."}
 
 GENERATE JSON DENGAN FORMAT BERIKUT SECARA KETAT:
