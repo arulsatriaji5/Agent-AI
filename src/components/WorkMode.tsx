@@ -328,12 +328,10 @@ export function WorkMode() {
           /* Empty State: Hero Layout */
           <div className="max-w-4xl mx-auto w-full p-4 sm:p-8 space-y-10 mt-6 sm:mt-10 animate-in fade-in zoom-in-95 duration-500">
             <div className="text-center space-y-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600 font-bold text-white shadow-lg mb-4 mx-auto text-xl">
-                AS
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              <img src="/logo_1.png" alt="Agens" className="h-14 w-auto mx-auto mb-6 drop-shadow-md" />
+              <h2 className="text-3xl md:text-4xl font-medium text-center mb-8 bg-gradient-to-r from-blue-900 to-sky-400 dark:from-blue-400 dark:to-sky-200 bg-clip-text text-transparent">
                 Apa yang harus kita kerjakan?
-              </h1>
+              </h2>
             </div>
 
             
@@ -422,8 +420,8 @@ export function WorkMode() {
                 )}
               </div>
             )}
-
-            ) : (
+          </div>
+        ) : (
           /* Active State: Conversational Thread */
           <div className="max-w-3xl mx-auto w-full p-4 sm:p-6 space-y-6 pt-8">
             {messages.map((msg) => (
@@ -553,45 +551,7 @@ export function WorkMode() {
           </div>
 
 
-            {/* Text Input */}
-            <textarea 
-              value={taskInput}
-              onChange={(e) => setTaskInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  runAction();
-                }
-              }}
-              onInput={(e) => {
-                const target = e.target;
-                target.style.height = "auto";
-                target.style.height = `${Math.min(target.scrollHeight, 150)}px`;
-              }}
-              placeholder="Tuliskan instruksi analisis Anda..." 
-              rows={1}
-              className="flex-1 bg-transparent text-gray-900 dark:text-gray-100 px-2 py-2.5 focus:outline-none placeholder-gray-400 dark:placeholder-gray-500 text-sm resize-none max-h-[150px] overflow-y-auto"
-            />
-
-            {/* Model Selector */}
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              className="bg-transparent text-gray-500 dark:text-gray-400 border-none px-1 py-1 focus:outline-none focus:ring-0 cursor-pointer text-xs max-w-[100px] truncate hidden sm:block"
-            >
-              <option className="bg-white dark:bg-[#1e1f20]" value="gemini-2.5-flash">Gemini 2.5</option>
-              <option className="bg-white dark:bg-[#1e1f20]" value="llama-3.3-70b-versatile">Llama 3.3</option>
-            </select>
-
-            {/* Send Button */}
-            <button 
-              onClick={() => runAction()}
-              disabled={isWorking || (!taskInput.trim() && attachments.length === 0)}
-              className="p-2.5 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 rounded-full transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              <ArrowUp className="w-5 h-5" />
-            </button>
-          </div>
+            
           <p className="text-center text-[11px] text-gray-400 dark:text-gray-500 mt-3 hidden sm:block">
             Agens dapat melakukan kesalahan. Harap periksa informasi penting.
           </p>
